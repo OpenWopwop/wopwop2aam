@@ -1,0 +1,6 @@
+[submodule "dependencies/wopwopd"]
+	path = dependencies/wopwopd
+	url = git@github.com:PsuAeroacoustics/wopwopd.git
+[submodule "dependencies/numd"]
+	path = dependencies/numd
+	url = git@github.com:Rob-Rau/numd.git
