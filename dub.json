@@ -1,7 +1,6 @@
 {
 	"name": "wopwop2aam",
 	"dependencies": {
-		"numd": {"path": "./dependencies/numd"},
 		"wopwopd": {"path": "./dependencies/wopwopd"}
 	},
 	"targetType": "executable",
