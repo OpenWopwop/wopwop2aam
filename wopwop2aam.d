@@ -1,7 +1,5 @@
 module wopwop2aam;
 
-//import plt = matplotlibd.pyplot;
-
 import netcdf;
 
 import std.algorithm;
@@ -17,19 +15,10 @@ import std.stdio;
 import std.string;
 import std.typecons;
 
-double safe_log10(double x) {
-    if (x == 0) {
-        return -double.infinity;
-    } 
-	if (x < 0) {
-        return double.nan;
-	} else {
-        return log10(x);
-	}
-}
+import wopwopd.namelist;
 
 struct Dataset {
-	float mach_number;
+	float speed;
 	float flight_path_angle;
 	float tilt_angle;
 	float sphere_radius;
@@ -40,8 +29,8 @@ struct Dataset {
 		import std.bitmanip : read, write, Endian;
 		ubyte[12] buff;
 
-		buff[].write!float(mach_number, 0);
-		buff[].write!float(flight_path_angle, 4);
+		buff[].write!float(flight_path_angle, 0);
+		buff[].write!float(speed, 4);
 		buff[].write!float(tilt_angle, 8);
 
 		auto hashfunc = MurmurHash3!(uint.sizeof*8, 64)();
@@ -66,25 +55,18 @@ struct Channel {
 	Function[] functions;
 }
 
-auto read_dataset(string dir) {
+auto read_dataset(string dir, double fpa, double speed, double tilt_angle, double sphere_radius) {
 	int[] header_buffer = new int[4];
 
 	auto spectrum_file = File(dir.buildPath("spl_spectrum.fn"), "rb");
 	scope(exit) spectrum_file.close;
 
-	float[] flight_condition = readText(dir.buildPath("flight_condition.txt")).split(",").map!(a => a.strip.to!float).array;
-
 	Dataset dataset;
 
-	dataset.mach_number = flight_condition[0];
-	dataset.flight_path_angle = flight_condition[1];
-	dataset.tilt_angle = flight_condition[2];
-	dataset.sphere_radius = flight_condition[3];
-
-	//writeln("mach number: ", mach_number);
-	//writeln("flight path angle: ", flight_path_angle);
-	//writeln("tilt angle: ", tilt_angle);
-	//writeln("sphere radius: ", sphere_radius);
+	dataset.speed = speed;
+	dataset.flight_path_angle = fpa;
+	dataset.tilt_angle = tilt_angle;
+	dataset.sphere_radius = sphere_radius;
 
 	header_buffer = spectrum_file.rawRead(header_buffer);
 
@@ -92,11 +74,6 @@ auto read_dataset(string dir) {
 	int j_max = header_buffer[1];
 	int samples = header_buffer[2];
 	int functions = header_buffer[3];
-
-	//writeln("i_max: ", i_max);
-	//writeln("j_max: ", j_max);
-	//writeln("samples: ", samples);
-	//writeln("functions: ", functions);
 
 	size_t total_obs = i_max*j_max;
 
@@ -131,17 +108,36 @@ auto read_dataset(string dir) {
 	return dataset;
 }
 
-void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere = false) {
+void to_aam_sphere(ref Dataset dataset, string output_file, ref ObserverIn observer) {
 	
-	float[] thetas = iota(0., 185., 5.).map!(a => a.to!float).array;
-	float[] phis = iota(-180., 180., 10.).map!(a => a.to!float).array;
+	float theta_delta = (observer.thetaMax.get - observer.thetaMin.get)/(observer.nbTheta.get.to!float - 1);
+
+	// Wopwop calls it psi, aam calls it phi. convert names here
+	float phi_delta = (observer.psiMax.get - observer.psiMin.get)/(observer.nbPsi.get.to!float - 1);
+
+	float[] thetas = iota(observer.thetaMin.get, observer.thetaMax.get, theta_delta).map!(a => a.to!float).array;
+	float[] phis = iota(observer.psiMin.get, observer.psiMax.get, phi_delta).map!(a => a.to!float).array;
 
 	float[] amplitude;
 
 	size_t channel_idx = 0;
 
-	if(!hemisphere) {
-		amplitude = new float[thetas.length*phis.length*dataset.channels[0].frequency.length];
+	amplitude = new float[thetas.length*phis.length*dataset.channels[0].frequency.length];
+
+	auto index_swap = observer.indexSwap.isNull ? false : observer.indexSwap.get;
+	if(index_swap) {
+		foreach(t_idx, theta; thetas) {
+			foreach(p_idx, phi; phis) {
+				foreach(f_idx; 0..dataset.channels[0].frequency.length) {
+					//size_t amp_idx = f_idx + t_idx*dataset.channels[0].frequency.length + p_idx*dataset.channels[0].frequency.length*thetas.length;
+					size_t amp_idx = f_idx + p_idx*dataset.channels[0].frequency.length + t_idx*dataset.channels[0].frequency.length*phis.length;
+					amplitude[amp_idx] = dataset.channels[channel_idx].functions[2].data[f_idx];
+				}
+				channel_idx++;
+			}
+		}
+	} else {
+		
 		foreach(p_idx, phi; phis) {
 			foreach(t_idx, theta; thetas) {
 				foreach(f_idx; 0..dataset.channels[0].frequency.length) {
@@ -151,40 +147,11 @@ void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere 
 				channel_idx++;
 			}
 		}
-	} else {
-		float[] real_phis;
-		foreach(phi; phis) {
-			if((phi >= -90) && (phi <= 90)) {
-				real_phis ~= phi;
-			}
-		}
-		amplitude = new float[thetas.length*real_phis.length*dataset.channels[0].frequency.length];
-
-		size_t rp_idx = 0;
-		foreach(p_idx, phi; phis) {
-			foreach(t_idx, theta; thetas) {
-				if((phi >= -90) && (phi <= 90)) {
-					foreach(f_idx; 0..dataset.channels[0].frequency.length) {
-						size_t amp_idx = f_idx + t_idx*dataset.channels[0].frequency.length + rp_idx*dataset.channels[0].frequency.length*thetas.length;
-						amplitude[amp_idx] = dataset.channels[channel_idx].functions[2].data[f_idx];
-					}
-				}
-				channel_idx++;
-			}
-
-			if((phi >= -90) && (phi <= 90)) {
-				rp_idx++;
-			}
-		}
-
-		phis = real_phis;
 	}
 
-	import std.format : format;
-	auto filename = format!("%s%06d.nc")("sphere_", idx);
-
 	int file_handle;
-	auto nc_ret = nc_create(dir.buildPath(filename).toStringz, NC_WRITE, &file_handle);
+
+	auto nc_ret = nc_create(output_file.toStringz, NC_WRITE, &file_handle);
 	enforce(nc_ret == NC_NOERR, "Failed to create netCDF file");
 	scope(exit) nc_close(file_handle);
 
@@ -200,8 +167,8 @@ void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere 
 	nc_ret = nc_def_dim(file_handle, "FREQUENCY_DIM", dataset.channels[0].frequency.length, &frequency_dimid);
 	enforce(nc_ret == NC_NOERR, "Failed to define frequency dimension");
 
-	int mach_dimid;
-	nc_ret = nc_def_dim(file_handle, "MACH_DIM", 1, &mach_dimid);
+	int speed_dimid;
+	nc_ret = nc_def_dim(file_handle, "MACH_DIM", 1, &speed_dimid);
 	enforce(nc_ret == NC_NOERR, "Failed to define Mach number dimension");
 
 	int fpa_dimid;
@@ -224,8 +191,8 @@ void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere 
 	nc_ret = nc_def_var(file_handle, "THETA", NC_FLOAT, 1, &theta_dimid, &theta_varid);
 	enforce(nc_ret == NC_NOERR, "Failed to define theta variable");
 
-	int mach_varid;
-	nc_ret = nc_def_var(file_handle, "MACH", NC_FLOAT, 1, &mach_dimid, &mach_varid);
+	int speed_varid;
+	nc_ret = nc_def_var(file_handle, "SPEED", NC_FLOAT, 1, &speed_dimid, &speed_varid);
 	enforce(nc_ret == NC_NOERR, "Failed to define Mach number variable");
 
 	int fpa_varid;
@@ -254,7 +221,7 @@ void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere 
 
 	nc_ret = nc_put_var_float(file_handle, radius_varid, &dataset.sphere_radius);
 	enforce(nc_ret == NC_NOERR, "Failed to put sphere radius with error "~nc_ret.to!string);
-	nc_ret = nc_put_var_float(file_handle, mach_varid, &dataset.mach_number);
+	nc_ret = nc_put_var_float(file_handle, speed_varid, &dataset.speed);
 	enforce(nc_ret == NC_NOERR, "Failed to put mach number with error "~nc_ret.to!string);
 	nc_ret = nc_put_var_float(file_handle, fpa_varid, &dataset.flight_path_angle);
 	enforce(nc_ret == NC_NOERR, "Failed to put flight path angle with error "~nc_ret.to!string);
@@ -278,17 +245,21 @@ void to_aam_sphere(ref Dataset dataset, string dir, size_t idx, bool hemisphere 
 
 int main(string[] args) {
 
-	string directory = "./";
-	string output_directory = "./";
-	bool hemispheres = false;
+	string namelist_file = "";
+	string output_file = "./sphere.nc";
+	double fpa;
+	double tilt_angle;
+	double speed;
 
 	arraySep = ",";
 	auto help_information = getopt(
 		args,
 		std.getopt.config.bundling,
-		"directory|d", "Directory of wopwop results to process", &directory,
-		"output|o", "Output directory for aam spheres", &output_directory,
-		"hemisphere|e", "Only convert and output bottom hemisphere", &hemispheres
+		"namelist|n", "Wopwop case namelist to generate one AAM sphere from", &namelist_file,
+		"fpa|f", "Flight path angle in degrees", &fpa,
+		"tilt|t", "Nacelle tilt angle in degrees", &tilt_angle,
+		"speed|s", "Speed in knots", &speed,
+		"output|o", "Output file for aam sphere", &output_file
 	);
 
 	if(help_information.helpWanted) {
@@ -297,55 +268,42 @@ int main(string[] args) {
 		exit(-1);
 	}
 
+	enforce(!fpa.isNaN, "Need to supply a flight path angle for the flight condition");
+	enforce(!tilt_angle.isNaN, "Need to supply a nacelle tilt angle for the flight condition");
+	enforce(!speed.isNaN, "Need to supply a speed for the flight condition");
+
+	auto namelist = parse_namelist(namelist_file);
+
+	enforce(!namelist.environment_in.spectrumFlag.isNull, "spectrumFlag not specified in namelist. We need spectrum output to continue");
+	enforce(namelist.environment_in.spectrumFlag.get, "spectrumFlag set to false in namelist. We need spectrum output to continue");
+
+	enforce(namelist.observers.length > 0, "No ObserverIn namelists specified");
+	if(namelist.observers.length > 1) {
+		writeln("WARNING: More than 1 observer namelist was supplied, only using first one.");
+	}
+
+	enforce(!namelist.observers[0].radius.isNull, "No sphere grid radius specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].nbTheta.isNull, "nbTheta not specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].nbPsi.isNull, "nbPsi not specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].thetaMax.isNull, "thetaMax not specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].thetaMin.isNull, "thetaMin not specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].psiMax.isNull, "psiMax not specified in ObserverIn namelist");
+	enforce(!namelist.observers[0].psiMin.isNull, "psiMin not specified in ObserverIn namelist");
+
+	auto output_directory = output_file.dirName;
+
 	if(!output_directory.exists) {
 		mkdir(output_directory);
 	}
 
-	size_t[] dataset_hashes;
+	auto namelist_directory = namelist_file.dirName;
 
-	auto directories = dirEntries(directory, SpanMode.shallow).array;
-	
-	alias Condition = Tuple!(string, "directory", float, "m", float, "fpa", float, "tilt");
+	if(namelist_directory.buildPath("spl_spectrum.fn").exists) {
+		auto dataset = read_dataset(namelist_directory, fpa, speed, tilt_angle, namelist.observers[0].radius.get);
 
-	Condition[] conditions = new Condition[directories.length];
-
-	foreach(d_idx, dir; directories) {
-		if(!dir.isDir) {
-			continue;
-		}
-		float[] flight_condition = readText(dir.buildPath("flight_condition.txt")).split(",").map!(a => a.strip.to!float).array;
-
-		conditions[d_idx] = Condition(dir, flight_condition[0], flight_condition[1], flight_condition[2]);
-	}
-
-	// multiSort!("a.x < b.x", "a.y < b.y", SwapStrategy.unstable)(pts1);
-
-	conditions.multiSort!("a.m < b.m", "a.fpa < b.fpa", "a.tilt < b.tilt");
-
-	size_t d_idx = 0;
-	foreach(condition; conditions) {
-		/+if(!condition.directory.isDir) {
-			continue;
-		}+/
-
-		if(condition.directory.buildPath("spl_spectrum.fn").exists) {
-
-			auto dataset = read_dataset(condition.directory);
-
-			size_t hash = dataset.hash;
-
-			enforce(!dataset_hashes.canFind(hash), "Found duplicate database hash");
-
-			//writeln("Converting ", condition.directory, ". Flight condition hash: ", hash);
-			dataset_hashes ~= hash;
-
-			import std.format : format;
-			writeln("Converting ", condition.directory, " to ", format!("%s%06d.nc")("sphere_", d_idx));
-
-			dataset.to_aam_sphere(output_directory, d_idx, hemispheres);
-
-			d_idx++;
-		}
+		dataset.to_aam_sphere(output_file, namelist.observers[0]);
+	} else {
+		writeln("ERROR: ", namelist_directory.buildPath("spl_spectrum.fn"), " does not exists. Exiting.");
 	}
 
 	return 0;
