@@ -9,7 +9,7 @@ wopwop2aam depends on wopwopd, a support library for reading and writing OpenWop
 git submodule update --init --recursive
 ```
 
-It also depends on netCDF. One can either install this from source, or a package manager if ones system has it.
+It also depends on netCDF. One can either install this from source, or a package manager if available.
 
 ## Building
 wopwop2aam is written in D and uses D's build system dub. The easiest way to build is
