@@ -1,7 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"mpid": "~master",
+		"mpid": {"path":"dependencies/wopwopd/mpid-master"},
 		"numd": {"path":"dependencies/wopwopd/dependencies/numd"},
 		"wopwopd": {"path":"dependencies/wopwopd"}
 	}

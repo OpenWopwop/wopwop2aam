@@ -4,8 +4,9 @@
 		"wopwopd": {"path": "./dependencies/wopwopd"}
 	},
 	"targetType": "executable",
-	"sourceFiles": ["wopwop2aam.d", "netcdf.d"],
-	"lflags": ["-lnetcdf"],
+  "sourceFiles": [ "wopwop2aam.d", "netcdf.d" ],
+  "libs":["netcdf"],
+  "lflags-windows": ["/LIBPATH:/usr/lib/"],
 	"buildTypes": {
 		"debug": {
 			"buildOptions": ["debugMode", "debugInfo"]
