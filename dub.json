@@ -6,7 +6,7 @@
 	"targetType": "executable",
   "sourceFiles": [ "wopwop2aam.d", "netcdf.d" ],
   "libs":["netcdf"],
-  "lflags-windows": ["/LIBPATH:/usr/lib/"],
+  "lflags-windows": ["/LIBPATH:C:\\Program Files\\netCDF 4.8.1\\lib"],
 	"buildTypes": {
 		"debug": {
 			"buildOptions": ["debugMode", "debugInfo"]
