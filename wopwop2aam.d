@@ -75,6 +75,11 @@ auto read_dataset(string dir, double fpa, double speed, double tilt_angle, doubl
 	int samples = header_buffer[2];
 	int functions = header_buffer[3];
 
+	writeln("i_max: ", i_max);
+	writeln("j_max: ", j_max);
+	writeln("samples: ", samples);
+	writeln("functions: ", functions);
+
 	size_t total_obs = i_max*j_max;
 
 	dataset.channels = new Channel[total_obs];
@@ -277,6 +282,10 @@ int main(string[] args) {
 	enforce(!namelist.environment_in.spectrumFlag.isNull, "spectrumFlag not specified in namelist. We need spectrum output to continue");
 	enforce(namelist.environment_in.spectrumFlag.get, "spectrumFlag set to false in namelist. We need spectrum output to continue");
 
+	if(!namelist.environment_in.ASCIIOutputFlag.isNull) {
+		enforce(!namelist.environment_in.ASCIIOutputFlag.get, "ASCIIOutputFlag is set to true. Only binary data files are currently supported");
+	}
+	
 	enforce(namelist.observers.length > 0, "No ObserverIn namelists specified");
 	if(namelist.observers.length > 1) {
 		writeln("WARNING: More than 1 observer namelist was supplied, only using first one.");
