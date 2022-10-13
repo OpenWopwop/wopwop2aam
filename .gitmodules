@@ -1,3 +1,3 @@
 [submodule "dependencies/wopwopd"]
 	path = dependencies/wopwopd
-	url = ../wopwopd.git
+	url = ../../PsuAeroacoustics/wopwopd.git
