@@ -1,0 +1,26 @@
+Determining if the function log10 exists failed with the following output:
+Change Dir: /mnt/d/Fall 22/Research/comp_check/Computational_pipeline/dependencies/wopwop2aam/dependencies/udunits-2.2.28/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_0c36e/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_0c36e.dir/build.make CMakeFiles/cmTC_0c36e.dir/build
+gmake[1]: Entering directory '/mnt/d/Fall 22/Research/comp_check/Computational_pipeline/dependencies/wopwop2aam/dependencies/udunits-2.2.28/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_0c36e.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=log10 -fPIE -std=gnu99 -o CMakeFiles/cmTC_0c36e.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+<command-line>: warning: conflicting types for built-in function ‘log10’; expected ‘double(double)’ [-Wbuiltin-declaration-mismatch]
+/usr/share/cmake-3.22/Modules/CheckFunctionExists.c:7:3: note: in expansion of macro ‘CHECK_FUNCTION_EXISTS’
+    7 |   CHECK_FUNCTION_EXISTS(void);
+      |   ^~~~~~~~~~~~~~~~~~~~~
+/usr/share/cmake-3.22/Modules/CheckFunctionExists.c:1:1: note: ‘log10’ is declared in header ‘<math.h>’
+  +++ |+#include <math.h>
+    1 | #ifdef CHECK_FUNCTION_EXISTS
+Linking C executable cmTC_0c36e
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0c36e.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=log10 CMakeFiles/cmTC_0c36e.dir/CheckFunctionExists.c.o -o cmTC_0c36e 
+/usr/bin/ld: CMakeFiles/cmTC_0c36e.dir/CheckFunctionExists.c.o: in function `main':
+CheckFunctionExists.c:(.text+0x14): undefined reference to `log10'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_0c36e.dir/build.make:99: cmTC_0c36e] Error 1
+gmake[1]: Leaving directory '/mnt/d/Fall 22/Research/comp_check/Computational_pipeline/dependencies/wopwop2aam/dependencies/udunits-2.2.28/build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_0c36e/fast] Error 2
+
+
+
